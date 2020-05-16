@@ -1,18 +1,28 @@
 package com.example.googlemapdire;
 
 import android.Manifest;
+import android.app.AlertDialog;
+import android.app.Notification;
+import android.app.PendingIntent;
+import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.location.Location;
 import android.os.Build;
 import android.os.Bundle;
+import android.renderscript.RenderScript;
 import android.widget.Toast;
 
 import androidx.core.app.ActivityCompat;
+import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.FragmentActivity;
 
+import com.androidnetworking.AndroidNetworking;
+import com.androidnetworking.error.ANError;
+import com.androidnetworking.interfaces.JSONArrayRequestListener;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.LocationListener;
@@ -26,13 +36,22 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.gson.JsonObject;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Timer;
+import java.util.TimerTask;
+
+import static android.app.NotificationChannel.DEFAULT_CHANNEL_ID;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback,
         GoogleApiClient.ConnectionCallbacks,
         GoogleApiClient.OnConnectionFailedListener,
-        LocationListener {
+        LocationListener{
 
     private GoogleMap mMap;
     ArrayList<LatLng> MarkerPoints;
@@ -62,29 +81,58 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         // create bitmap for icon
         BitmapDrawable bitmapdraw = (BitmapDrawable)getResources().getDrawable(R.drawable.icon);
         markerIcon = Bitmap.createScaledBitmap(bitmapdraw.getBitmap(), 120, 120, false);
+
+        AndroidNetworking.initialize(getApplicationContext());
     }
 
     public void drawMarkers()
     {
-        // @todo call api -> get location -> draw markers
-        {
-            LatLng latLng = new LatLng(6.47387023705, 79.9821086364);
-            MarkerOptions markerOptions = new MarkerOptions();
-            markerOptions.position(latLng);
-            markerOptions.title("P 2/10");
-            markerOptions.icon(BitmapDescriptorFactory.fromBitmap(markerIcon));
-            mCurrLocationMarker = mMap.addMarker(markerOptions);
-        }
+        String host  = getString(R.string.host);
+        System.out.println("drawMarkers: " + host);
+        AndroidNetworking.get("http://" + host + "/locations")
+                .build()
+                .getAsJSONArray(new JSONArrayRequestListener() {
+                    @Override
+                    public void onResponse(JSONArray response) {
+                        System.out.println("------ drawMarkers: " + response.length());
+                        for(int i = 0; i < response.length(); ++i) {
 
-        {
-            LatLng latLng = new LatLng(6.48387023705, 79.9921086364);
-            MarkerOptions markerOptions = new MarkerOptions();
-            markerOptions.position(latLng);
-            markerOptions.title("P 5/10");
-//            markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE));
-            markerOptions.icon(BitmapDescriptorFactory.fromBitmap(markerIcon));
-            mCurrLocationMarker = mMap.addMarker(markerOptions);
-        }
+                            try {
+                                JSONObject location = response.getJSONObject(i);
+                                double lng = location.getDouble("lon");
+                                double lat = location.getDouble("lat");
+                                String lname = location.getString("lname");
+                                int bc = location.getInt("bc");
+                                int slots = location.getInt("slots");
+
+                                System.out.println("------ drawMarkers: adding marker:"
+                                        + i + "[lng:" + lng + " lat:" + lat + " lname:"+ lname +" bc:"+bc +"/" + slots +"]");
+
+                                LatLng latLng = new LatLng(lat, lng);
+                                MarkerOptions markerOptions = new MarkerOptions();
+                                markerOptions.position(latLng);
+                                markerOptions.title(lname + ":" + (slots -  bc));//  @todo show available locations
+                                markerOptions.icon(BitmapDescriptorFactory.fromBitmap(markerIcon));
+                                mCurrLocationMarker = mMap.addMarker(markerOptions);
+
+                            } catch (JSONException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                    @Override
+                    public void onError(ANError error) {
+                        System.out.println("--------error: drawMarkers: " + error);
+                    }
+                });
+//        {
+//            LatLng latLng = new LatLng(6.47387023705, 79.9821086364);
+//            MarkerOptions markerOptions = new MarkerOptions();
+//            markerOptions.position(latLng);
+//            markerOptions.title("P 2/10");
+//            markerOptions.icon(BitmapDescriptorFactory.fromBitmap(markerIcon));
+//            mCurrLocationMarker = mMap.addMarker(markerOptions);
+//        }
     }
     /**
      * Manipulates the map once available.
