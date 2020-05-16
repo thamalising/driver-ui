@@ -54,7 +54,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         LocationListener{
 
     private GoogleMap mMap;
-    ArrayList<LatLng> MarkerPoints;
     GoogleApiClient mGoogleApiClient;
     Location mLastLocation;
     Marker mCurrLocationMarker;
@@ -70,8 +69,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             checkLocationPermission();
         }
-        // Initializing
-        MarkerPoints = new ArrayList<>();
 
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
@@ -111,7 +108,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                 LatLng latLng = new LatLng(lat, lng);
                                 MarkerOptions markerOptions = new MarkerOptions();
                                 markerOptions.position(latLng);
-                                markerOptions.title(lname + ":" + (slots -  bc));//  @todo show available locations
+                                markerOptions.title(lname + ": " + (slots -  bc) + " slots");//  @todo show available locations
                                 markerOptions.icon(BitmapDescriptorFactory.fromBitmap(markerIcon));
                                 mCurrLocationMarker = mMap.addMarker(markerOptions);
 
@@ -196,6 +193,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     }
 
+    private int maxonLocationCount = 0;
     @Override
     public void onLocationChanged(Location location) {
         // on current location changed
@@ -204,9 +202,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         // move map camera to current location
         LatLng currentLocation = new LatLng(location.getLatitude(), location.getLongitude());
         mMap.moveCamera(CameraUpdateFactory.newLatLng(currentLocation));
-        mMap.animateCamera(CameraUpdateFactory.zoomTo(15));
+        mMap.animateCamera(CameraUpdateFactory.zoomTo(13));
 
-        // @todo call drawmarkers per each min
+        ++maxonLocationCount;
+        if (maxonLocationCount > 100) {
+            maxonLocationCount = 0;
+            drawMarkers();
+        }
 
         //stop location updates
         if (mGoogleApiClient != null) {
