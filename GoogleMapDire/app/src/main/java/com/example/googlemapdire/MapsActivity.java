@@ -56,7 +56,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private GoogleMap mMap;
     GoogleApiClient mGoogleApiClient;
     Location mLastLocation;
-    Marker mCurrLocationMarker;
+    ArrayList<Marker> mCurrLocationMarkers = new ArrayList<Marker>();
     LocationRequest mLocationRequest;
 
     Bitmap markerIcon;
@@ -73,19 +73,26 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
+        // register this onMapReady for get the map instance later
         mapFragment.getMapAsync(this);
 
-        // create bitmap for icon
+        // tmz changed
+        // bitmap for parking icon P
         BitmapDrawable bitmapdraw = (BitmapDrawable)getResources().getDrawable(R.drawable.icon);
         markerIcon = Bitmap.createScaledBitmap(bitmapdraw.getBitmap(), 120, 120, false);
 
+        // initialize for rest api calling at the begnining
         AndroidNetworking.initialize(getApplicationContext());
     }
 
+    // tmz changed
     public void drawMarkers()
     {
+        mCurrLocationMarkers.clear();
+        // get the webservice host
         String host  = getString(R.string.host);
         System.out.println("drawMarkers: " + host);
+        // rest get location
         AndroidNetworking.get("http://" + host + "/locations")
                 .build()
                 .getAsJSONArray(new JSONArrayRequestListener() {
@@ -101,6 +108,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                 String lname = location.getString("lname");
                                 int bc = location.getInt("bc");
                                 int slots = location.getInt("slots");
+                                // donest show if no available locations
+                                if (slots - bc == 0) continue;
 
                                 System.out.println("------ drawMarkers: adding marker:"
                                         + i + "[lng:" + lng + " lat:" + lat + " lname:"+ lname +" bc:"+bc +"/" + slots +"]");
@@ -108,9 +117,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                 LatLng latLng = new LatLng(lat, lng);
                                 MarkerOptions markerOptions = new MarkerOptions();
                                 markerOptions.position(latLng);
-                                markerOptions.title(lname + ": " + (slots -  bc) + " slots");//  @todo show available locations
+                                markerOptions.title(lname + ": " + (slots -  bc) + " slots");// show available locations
                                 markerOptions.icon(BitmapDescriptorFactory.fromBitmap(markerIcon));
-                                mCurrLocationMarker = mMap.addMarker(markerOptions);
+                                mCurrLocationMarkers.add(mMap.addMarker(markerOptions));
 
                             } catch (JSONException e) {
                                 e.printStackTrace();
@@ -140,6 +149,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
      * it inside the SupportMapFragment. This method will only be triggered once the user has
      * installed Google Play services and returned to the app.
      */
+    // tmz changed
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
@@ -176,8 +186,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     @Override
     public void onConnected(Bundle bundle) {
-
+        // configure accuracy level for this application
         mLocationRequest = new LocationRequest();
+        // Set the desired interval for active location updates, in milliseconds.
         mLocationRequest.setInterval(1000);
         mLocationRequest.setFastestInterval(1000);
         mLocationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
@@ -194,6 +205,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     private int maxonLocationCount = 0;
+    // tmz changed
+    // the fucntion called on own-location changed
     @Override
     public void onLocationChanged(Location location) {
         // on current location changed
@@ -205,6 +218,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap.animateCamera(CameraUpdateFactory.zoomTo(13));
 
         ++maxonLocationCount;
+        // re draw markers coz they can be unavailable
         if (maxonLocationCount > 100) {
             maxonLocationCount = 0;
             drawMarkers();
