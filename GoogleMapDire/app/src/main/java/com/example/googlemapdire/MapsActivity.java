@@ -56,7 +56,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private GoogleMap mMap;
     GoogleApiClient mGoogleApiClient;
     Location mLastLocation;
-    ArrayList<Marker> mCurrLocationMarkers = new ArrayList<Marker>();
+    ArrayList<Marker> mMarkers = new ArrayList<Marker>();
     LocationRequest mLocationRequest;
 
     Bitmap markerIcon;
@@ -88,7 +88,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     // tmz changed
     public void drawMarkers()
     {
-        mCurrLocationMarkers.clear();
+        mMarkers.clear();
         // get the webservice host
         String host  = getString(R.string.host);
         System.out.println("drawMarkers: " + host);
@@ -119,7 +119,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                                 markerOptions.position(latLng);
                                 markerOptions.title(lname + ": " + (slots -  bc) + " slots");// show available locations
                                 markerOptions.icon(BitmapDescriptorFactory.fromBitmap(markerIcon));
-                                mCurrLocationMarkers.add(mMap.addMarker(markerOptions));
+                                mMarkers.add(mMap.addMarker(markerOptions));
 
                             } catch (JSONException e) {
                                 e.printStackTrace();
@@ -236,6 +236,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     public static final int MY_PERMISSIONS_REQUEST_LOCATION = 99;
+    // check whether this program has the access to googlemap loactions
     public boolean checkLocationPermission(){
         if (ContextCompat.checkSelfPermission(this,
                 Manifest.permission.ACCESS_FINE_LOCATION)
