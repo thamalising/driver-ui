@@ -58,6 +58,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     Location mLastLocation;
     ArrayList<Marker> mMarkers = new ArrayList<Marker>();
     LocationRequest mLocationRequest;
+    private Timer timer;
 
     Bitmap markerIcon;
 
@@ -76,7 +77,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         // register this onMapReady for get the map instance later
         mapFragment.getMapAsync(this);
 
-        // tmz changed
         // bitmap for parking icon P
         BitmapDrawable bitmapdraw = (BitmapDrawable)getResources().getDrawable(R.drawable.icon);
         markerIcon = Bitmap.createScaledBitmap(bitmapdraw.getBitmap(), 120, 120, false);
@@ -85,71 +85,74 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         AndroidNetworking.initialize(getApplicationContext());
     }
 
-    // tmz changed
+    public void startTimer() {
+        timer = new Timer();
+        TimerTask timerTask = new TimerTask() {
+            @Override
+            public void run() {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        drawMarkers();
+                    }
+                });
+            }
+        };
+        // 10 sec timer to get location from web-service
+        timer.scheduleAtFixedRate(timerTask, 0, 20000);
+    }
+
     public void drawMarkers()
     {
-        mMarkers.clear();
         // get the webservice host
         String host  = getString(R.string.host);
         System.out.println("drawMarkers: " + host);
         // rest get location
         AndroidNetworking.get("http://" + host + "/locations")
-                .build()
-                .getAsJSONArray(new JSONArrayRequestListener() {
-                    @Override
-                    public void onResponse(JSONArray response) {
-                        System.out.println("------ drawMarkers: " + response.length());
-                        for(int i = 0; i < response.length(); ++i) {
+        .build()
+        .getAsJSONArray(new JSONArrayRequestListener() {
+            @Override
+            public void onResponse(JSONArray response) {
+                for (int i = 0; i < mMarkers.size(); ++i) {
+                    mMarkers.get(i).remove();
+                }
+                System.out.println("------ delete previous markres");
+                mMarkers.clear();
+                System.out.println("------ drawMarkers: " + response.length());
+                for(int i = 0; i < response.length(); ++i) {
 
-                            try {
-                                JSONObject location = response.getJSONObject(i);
-                                double lng = location.getDouble("lon");
-                                double lat = location.getDouble("lat");
-                                String lname = location.getString("lname");
-                                int bc = location.getInt("bc");
-                                int slots = location.getInt("slots");
-                                // donest show if no available locations
-                                if (slots - bc == 0) continue;
+                    try {
+                        JSONObject location = response.getJSONObject(i);
+                        double lng = location.getDouble("lon");
+                        double lat = location.getDouble("lat");
+                        String lname = location.getString("lname");
+                        int bc = location.getInt("bc");
+                        int slots = location.getInt("slots");
+                        // donest show if no available locations
+                        if (slots - bc == 0) continue;
 
-                                System.out.println("------ drawMarkers: adding marker:"
-                                        + i + "[lng:" + lng + " lat:" + lat + " lname:"+ lname +" bc:"+bc +"/" + slots +"]");
+                        System.out.println("------ drawMarkers: adding marker:"
+                                + i + "[lng:" + lng + " lat:" + lat + " lname:"+ lname +" bc:"+bc +"/" + slots +"]");
 
-                                LatLng latLng = new LatLng(lat, lng);
-                                MarkerOptions markerOptions = new MarkerOptions();
-                                markerOptions.position(latLng);
-                                markerOptions.title(lname + ": " + (slots -  bc) + " slots");// show available locations
-                                markerOptions.icon(BitmapDescriptorFactory.fromBitmap(markerIcon));
-                                mMarkers.add(mMap.addMarker(markerOptions));
+                        LatLng latLng = new LatLng(lat, lng);
+                        MarkerOptions markerOptions = new MarkerOptions();
+                        markerOptions.position(latLng);
+                        markerOptions.title(lname + ": " + (slots -  bc) + " slots");// show available locations
+                        markerOptions.icon(BitmapDescriptorFactory.fromBitmap(markerIcon));
+                        mMarkers.add(mMap.addMarker(markerOptions));
 
-                            } catch (JSONException e) {
-                                e.printStackTrace();
-                            }
-                        }
+                    } catch (JSONException e) {
+                        e.printStackTrace();
                     }
-                    @Override
-                    public void onError(ANError error) {
-                        System.out.println("--------error: drawMarkers: " + error);
-                    }
-                });
-//        {
-//            LatLng latLng = new LatLng(6.47387023705, 79.9821086364);
-//            MarkerOptions markerOptions = new MarkerOptions();
-//            markerOptions.position(latLng);
-//            markerOptions.title("P 2/10");
-//            markerOptions.icon(BitmapDescriptorFactory.fromBitmap(markerIcon));
-//            mCurrLocationMarker = mMap.addMarker(markerOptions);
-//        }
+                }
+            }
+            @Override
+            public void onError(ANError error) {
+                System.out.println("--------error: drawMarkers: " + error);
+            }
+        });
     }
-    /**
-     * Manipulates the map once available.
-     * This callback is triggered when the map is ready to be used.
-     * This is where we can add markers or lines, add listeners or move the camera. In this case,
-     * we just add a marker near Sydney, Australia.
-     * If Google Play services is not installed on the device, the user will be prompted to install
-     * it inside the SupportMapFragment. This method will only be triggered once the user has
-     * installed Google Play services and returned to the app.
-     */
-    // tmz changed
+
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
@@ -172,7 +175,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap.getUiSettings().setZoomControlsEnabled(true);
         mMap.getUiSettings().setMyLocationButtonEnabled(true);
 
-        drawMarkers();
+        startTimer();
     }
 
     protected synchronized void buildGoogleApiClient() {
@@ -204,27 +207,17 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     }
 
-    private int maxonLocationCount = 0;
-    // tmz changed
     // the fucntion called on own-location changed
     @Override
     public void onLocationChanged(Location location) {
-        // on current location changed
-        System.out.println("##current location ----- " +location);
-
+        System.out.println("##current location ----- " + location);
         // move map camera to current location
         LatLng currentLocation = new LatLng(location.getLatitude(), location.getLongitude());
         mMap.moveCamera(CameraUpdateFactory.newLatLng(currentLocation));
         mMap.animateCamera(CameraUpdateFactory.zoomTo(13));
 
-        ++maxonLocationCount;
-        // re draw markers coz they can be unavailable
-        if (maxonLocationCount > 100) {
-            maxonLocationCount = 0;
-            drawMarkers();
-        }
-
         //stop location updates
+        // just for focus on first time.then we dont need onLocationChanged to be called
         if (mGoogleApiClient != null) {
             LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
         }
@@ -254,8 +247,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 ActivityCompat.requestPermissions(this,
                         new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
                         MY_PERMISSIONS_REQUEST_LOCATION);
-
-
             } else {
                 // No explanation needed, we can request the permission.
                 ActivityCompat.requestPermissions(this,
@@ -288,15 +279,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         }
                         mMap.setMyLocationEnabled(true);
                     }
-
                 } else {
-
                     // Permission denied, Disable the functionality that depends on this permission.
                     Toast.makeText(this, "permission denied", Toast.LENGTH_LONG).show();
                 }
                 return;
             }
-
             // other 'case' lines to check for other permissions this app might request.
             // You can add here other case statements according to your requirement.
         }
