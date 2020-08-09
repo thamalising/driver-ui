@@ -85,11 +85,36 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         AndroidNetworking.initialize(getApplicationContext());
     }
 
+    @Override
+    public void onMapReady(GoogleMap googleMap) {
+        mMap = googleMap;
+
+        //Initialize Google Play Services
+        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (ContextCompat.checkSelfPermission(this,
+                    Manifest.permission.ACCESS_FINE_LOCATION)
+                    != PackageManager.PERMISSION_GRANTED) {
+                System.out.println("permission not granted");
+                return;
+            }
+        }
+
+        buildGoogleApiClient();
+        mMap.setMyLocationEnabled(true);
+
+        mMap.getUiSettings().setCompassEnabled(false);
+        mMap.getUiSettings().setZoomControlsEnabled(true);
+        mMap.getUiSettings().setMyLocationButtonEnabled(true);
+
+        startTimer();
+    }
+
     public void startTimer() {
         timer = new Timer();
         TimerTask timerTask = new TimerTask() {
             @Override
             public void run() {
+                // do work on a UI thread, but update on main thread
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
@@ -113,6 +138,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         .getAsJSONArray(new JSONArrayRequestListener() {
             @Override
             public void onResponse(JSONArray response) {
+                //remove previous markers
                 for (int i = 0; i < mMarkers.size(); ++i) {
                     mMarkers.get(i).remove();
                 }
@@ -153,31 +179,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         });
     }
 
-    @Override
-    public void onMapReady(GoogleMap googleMap) {
-        mMap = googleMap;
-
-        //Initialize Google Play Services
-        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (ContextCompat.checkSelfPermission(this,
-                    Manifest.permission.ACCESS_FINE_LOCATION)
-                    == PackageManager.PERMISSION_GRANTED) {
-                buildGoogleApiClient();
-                mMap.setMyLocationEnabled(true);
-            }
-        }
-        else {
-            buildGoogleApiClient();
-            mMap.setMyLocationEnabled(true);
-        }
-
-        mMap.getUiSettings().setCompassEnabled(true);
-        mMap.getUiSettings().setZoomControlsEnabled(true);
-        mMap.getUiSettings().setMyLocationButtonEnabled(true);
-
-        startTimer();
-    }
-
     protected synchronized void buildGoogleApiClient() {
         mGoogleApiClient = new GoogleApiClient.Builder(this)
                 .addConnectionCallbacks(this)
@@ -203,8 +204,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     @Override
-    public void onConnectionSuspended(int i) {
+    public void onConnectionFailed(ConnectionResult connectionResult) {
+        System.out.println("## onConnectionFailed----- ");
+    }
 
+    @Override
+    public void onConnectionSuspended(int i) {
+        System.out.println("## onConnectionSuspended----- ");
     }
 
     // the fucntion called on own-location changed
@@ -221,11 +227,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         if (mGoogleApiClient != null) {
             LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
         }
-    }
-
-    @Override
-    public void onConnectionFailed(ConnectionResult connectionResult) {
-
     }
 
     public static final int MY_PERMISSIONS_REQUEST_LOCATION = 99;
